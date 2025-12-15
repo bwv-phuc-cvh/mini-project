@@ -5,7 +5,9 @@ import { HashingService } from 'src/common/services/hashing.service';
 import { TokenService } from 'src/common/services/token.service';
 import { JwtPayload, RefreshTokenPayload } from 'src/common/types/jwt-payload.type';
 import { v4 as uuidv4 } from 'uuid';
-import moment from 'moment'
+import moment from 'moment';
+import { OtpService } from '../otp/otp.service';
+import { OtpPurpose } from 'generated/prisma';
 
 @Injectable()
 export class AuthService {
@@ -13,7 +15,8 @@ export class AuthService {
     private readonly authRepo: AuthRepository,
     private readonly hashingService: HashingService,
     private readonly tokenSerivce: TokenService,
-  ) { }
+    private readonly otpService: OtpService,
+  ) {}
 
   private async generateTokens(payload: JwtPayload, uuid: string) {
     const [accessToken, refreshToken] = await Promise.all([
@@ -33,7 +36,7 @@ export class AuthService {
   private async loginByUserId(userId: number) {
     const user = await this.authRepo.findUniqueUser({
       id: userId,
-    })
+    });
 
     if (!user) {
       throw new UnauthorizedException('User not found');
@@ -54,7 +57,7 @@ export class AuthService {
       userId: user.id,
       tokenHash: await this.hashingService.hash(refreshToken),
       expiresAt: moment().add(7, 'days').toDate(),
-    })
+    });
 
     return {
       accessToken,
@@ -88,6 +91,16 @@ export class AuthService {
       throw new ConflictException('Email already exists');
     }
 
+    const otpValid = await this.otpService.verifyOtp({
+      email: body.email,
+      code: body.code,
+      purpose: OtpPurpose.REGISTER,
+    });
+
+    if (!otpValid.verified) {
+      throw new UnauthorizedException('Invalid OTP code');
+    }
+
     const hashedPassword = await this.hashingService.hash(body.password);
 
     const user = await this.authRepo.createUser({
@@ -102,10 +115,13 @@ export class AuthService {
       role: user.role,
     };
 
-    const accessToken = await this.tokenSerivce.signAccessToken(payload);
+    const uuid = uuidv4();
+
+    const { accessToken, refreshToken } = await this.generateTokens(payload, uuid);
 
     return {
       accessToken,
+      refreshToken,
     };
   }
 
@@ -119,24 +135,22 @@ export class AuthService {
     }
 
     const token = await this.authRepo.findRefreshToken({
-      id: payload.tokenId
-    })
+      id: payload.tokenId,
+    });
 
     if (!token || token.revoked) {
       throw new UnauthorizedException('Refresh token revoked');
     }
 
-    const isValid = await this.hashingService.compare(
-      refreshToken, token.tokenHash
-    )
+    const isValid = await this.hashingService.compare(refreshToken, token.tokenHash);
 
     if (!isValid) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
     await this.authRepo.revokeRefreshToken({
-      id: token.id
-    })
+      id: token.id,
+    });
 
     return this.loginByUserId(payload.sub);
   }

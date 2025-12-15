@@ -18,7 +18,7 @@ export class AuthController {
   register(@Body() body: RegisterDTO) {
     return this.authService.register(body);
   }
-  
+
   @Public()
   @Post('refresh')
   refreshToken(@Body('refreshToken') refreshToken: string) {

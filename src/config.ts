@@ -38,6 +38,7 @@ const configSchema = z.object({
   S3_BUCKET_NAME: z.string(),
   // S3_ENPOINT: z.string(),
   // REDIS_URL: z.string(),
+  MAX_ATTEMPTS: z.string(),
 });
 
 const configServer = configSchema.safeParse(process.env);

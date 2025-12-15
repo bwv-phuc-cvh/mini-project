@@ -15,6 +15,7 @@ export const RegisterSchema = z
   })
   .extend({
     confirmPassword: z.string().min(6).max(100),
+    code: z.string().max(6),
   })
   .strict()
   .superRefine(({ confirmPassword, password }, ctx) => {

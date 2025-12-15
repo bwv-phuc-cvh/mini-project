@@ -178,14 +178,14 @@ model Media {
 }
 
 model EmailOtp {
-  id         String    @id @default(uuid())
+  id         Int        @id @default(autoincrement())
   email      String
   otpHash    String
   purpose    OtpPurpose // REGISTER | RESET_PASSWORD | VERIFY_EMAIL
   expiresAt  DateTime
   verifiedAt DateTime?
-  attempts   Int       @default(0)
-  createdAt  DateTime  @default(now())
+  attempts   Int        @default(0)
+  createdAt  DateTime   @default(now())
 
   @@index([email, purpose])
 }

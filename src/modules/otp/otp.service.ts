@@ -1,0 +1,82 @@
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { RequestOtpBodyType, VerifyOtpBodyType } from './otp.type';
+import { Otprepository } from './otp.repository';
+import moment from 'moment';
+import envConfig from 'src/config';
+import * as crypto from 'crypto';
+import { EmailService } from 'src/common/services/email.service';
+
+@Injectable()
+export class OtpService {
+  constructor(
+    private readonly otpRepo: Otprepository,
+    private readonly emailService: EmailService,
+  ) {}
+  private hashOtp(otp: string) {
+    return crypto.createHash('sha256').update(otp).digest('hex');
+  }
+
+  private generateOtp() {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  async requestOtp(body: RequestOtpBodyType) {
+    const recentOtp = await this.otpRepo.findFirst({
+      email: body.email,
+      purpose: body.purpose,
+      expiresAt: { gt: moment().toDate() },
+    });
+
+    if (recentOtp) {
+      return { message: 'An OTP has already been sent. Please check your email.' };
+    }
+
+    const otp = this.generateOtp();
+    const otpHash = this.hashOtp(otp);
+
+    await this.otpRepo.createOtp({
+      email: body.email,
+      otpHash,
+      purpose: body.purpose,
+      expiresAt: moment().add(5, 'minutes').toDate(),
+    });
+
+    const { error } = await this.emailService.sendOTP({ email: body.email, code: otp });
+
+    if (error) {
+      throw new BadRequestException({
+        field: 'code',
+        message: 'Failed to send OTP code, please try again later',
+      });
+    }
+
+    return { message: 'OTP has been sent to your email.' };
+  }
+
+  async verifyOtp({ email, code, purpose }: VerifyOtpBodyType) {
+    const record = await this.otpRepo.findFirst({
+      email,
+      purpose,
+    });
+
+    if (!record) throw new BadRequestException('OTP invalid');
+    if (record.verifiedAt) throw new BadRequestException('OTP already used');
+    if (moment().isAfter(record.expiresAt)) throw new BadRequestException('OTP expired');
+    if (record.attempts >= Number(envConfig.MAX_ATTEMPTS)) throw new BadRequestException('Too many attempts');
+
+    const isValid = this.hashOtp(code) === record.otpHash;
+    if (!isValid) {
+      await this.otpRepo.updateOtp(record.id, {
+        attempts: { increment: 1 },
+      });
+
+      throw new BadRequestException('OTP invalid');
+    }
+
+    await this.otpRepo.updateOtp(record.id, {
+      verifiedAt: moment().toDate(),
+    });
+
+    return { verified: true };
+  }
+}

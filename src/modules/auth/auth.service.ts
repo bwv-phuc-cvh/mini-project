@@ -164,14 +164,10 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    await this.otpService.requestOtp({
+    return await this.otpService.requestOtp({
       email: body.email,
       purpose: OtpPurpose.RESET_PASSWORD,
     });
-
-    return {
-      message: 'OTP sent to email',
-    };
   }
 
   async resetPassword(body: ResetPasswordBodyType) {

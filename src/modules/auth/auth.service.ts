@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { LoginBodyType, RegisterBodyType } from './auth.type';
+import { ForgotPasswordBodyType, LoginBodyType, RegisterBodyType, ResetPasswordBodyType } from './auth.type';
 import { AuthRepository } from './auth.repository';
 import { HashingService } from 'src/common/services/hashing.service';
 import { TokenService } from 'src/common/services/token.service';
@@ -153,5 +153,61 @@ export class AuthService {
     });
 
     return this.loginByUserId(payload.sub);
+  }
+
+  async forgotPassword(body: ForgotPasswordBodyType) {
+    const user = await this.authRepo.findUniqueUser({
+      email: body.email,
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    await this.otpService.requestOtp({
+      email: body.email,
+      purpose: OtpPurpose.RESET_PASSWORD,
+    });
+
+    return {
+      message: 'OTP sent to email',
+    };
+  }
+
+  async resetPassword(body: ResetPasswordBodyType) {
+    const user = await this.authRepo.findUniqueUser({
+      email: body.email,
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const otpValid = await this.otpService.verifyOtp({
+      email: body.email,
+      code: body.code,
+      purpose: OtpPurpose.RESET_PASSWORD,
+    });
+
+    if (!otpValid.verified) {
+      throw new UnauthorizedException('Invalid OTP code');
+    }
+
+    const hashedPassword = await this.hashingService.hash(body.newPassword);
+
+    await this.authRepo.updateUser(
+      {
+        id: user.id,
+      },
+      {
+        passwordHash: hashedPassword,
+      },
+    );
+
+    await this.authRepo.revokeAllRefreshTokensForUser(user.id);
+
+    return {
+      message: 'Password reset successful',
+    };
   }
 }

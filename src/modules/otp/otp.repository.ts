@@ -6,9 +6,10 @@ import { PrismaService } from 'src/prisma/prisma.service';
 export class Otprepository {
   constructor(private readonly prismaService: PrismaService) {}
 
-  async findFirst(where: Prisma.EmailOtpWhereInput) {
+  async findFirst(where: Prisma.EmailOtpWhereInput, orderBy?: Prisma.EmailOtpOrderByWithRelationInput) {
     return this.prismaService.emailOtp.findFirst({
       where,
+      orderBy
     });
   }
 
@@ -21,6 +22,13 @@ export class Otprepository {
   async updateOtp(id: number, data: Prisma.EmailOtpUpdateInput) {
     return this.prismaService.emailOtp.update({
       where: { id },
+      data,
+    });
+  }
+
+  async updateMany(where: Prisma.EmailOtpWhereInput, data: Prisma.EmailOtpUpdateManyMutationInput) {
+    return this.prismaService.emailOtp.updateMany({
+      where,
       data,
     });
   }

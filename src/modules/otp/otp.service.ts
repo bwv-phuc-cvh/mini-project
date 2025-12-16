@@ -11,7 +11,7 @@ export class OtpService {
   constructor(
     private readonly otpRepo: Otprepository,
     private readonly emailService: EmailService,
-  ) {}
+  ) { }
   private hashOtp(otp: string) {
     return crypto.createHash('sha256').update(otp).digest('hex');
   }
@@ -30,6 +30,14 @@ export class OtpService {
     if (recentOtp) {
       return { message: 'An OTP has already been sent. Please check your email.' };
     }
+
+    await this.otpRepo.updateMany({
+      email: body.email,
+      purpose: body.purpose,
+      verifiedAt: null,
+    }, {
+      verifiedAt: moment().toDate(),
+    });
 
     const otp = this.generateOtp();
     const otpHash = this.hashOtp(otp);
@@ -57,10 +65,12 @@ export class OtpService {
     const record = await this.otpRepo.findFirst({
       email,
       purpose,
+      verifiedAt: null,
+    }, {
+      createdAt: 'desc',
     });
 
     if (!record) throw new BadRequestException('OTP invalid');
-    if (record.verifiedAt) throw new BadRequestException('OTP already used');
     if (moment().isAfter(record.expiresAt)) throw new BadRequestException('OTP expired');
     if (record.attempts >= Number(envConfig.MAX_ATTEMPTS)) throw new BadRequestException('Too many attempts');
 

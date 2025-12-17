@@ -32,9 +32,7 @@ export class AuthRepository {
 
   async revokeRefreshToken(uniqueObject: Prisma.RefreshTokenWhereUniqueInput) {
     return this.prismaService.refreshToken.update({
-      where: {
-        id: uniqueObject.id,
-      },
+      where: uniqueObject,
       data: {
         revoked: true,
       },
@@ -57,6 +55,13 @@ export class AuthRepository {
     return this.prismaService.user.update({
       where: uniqueObject,
       data,
+    });
+  }
+
+  async findFristRefreshToken(where: Prisma.RefreshTokenWhereInput, orderBy?: Prisma.RefreshTokenOrderByWithRelationInput) {
+    return this.prismaService.refreshToken.findFirst({
+      where,
+      orderBy
     });
   }
 }

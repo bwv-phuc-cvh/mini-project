@@ -1,16 +1,32 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Req, UseGuards, Res } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Public } from 'src/common/decorators/public.decorator';
 import { ForgotPasswordDTO, LoginBodyDTO, RegisterDTO, ResetPasswordDTO } from './auth.dto';
+import type { Request, Response } from 'express';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import envConfig from 'src/config';
+import { AuthUser } from 'src/common/decorators/auth-user.decorator';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Public()
   @Post('login')
-  login(@Body() body: LoginBodyDTO) {
-    return this.authService.login(body);
+  async login(@Body() body: LoginBodyDTO,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.login(body);
+
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: envConfig.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/auth/refresh',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    return result;
   }
 
   @Public()
@@ -21,7 +37,8 @@ export class AuthController {
 
   @Public()
   @Post('refresh')
-  refreshToken(@Body('refreshToken') refreshToken: string) {
+  refreshToken(@Req() req: Request) {
+    const refreshToken = req.cookies.refreshToken;
     return this.authService.refreshToken(refreshToken);
   }
 
@@ -35,5 +52,12 @@ export class AuthController {
   @Post('reset-password')
   resetPassword(@Body() body: ResetPasswordDTO) {
     return this.authService.resetPassword(body);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  logout(@AuthUser('userId') userId: number,) {
+
+    return this.authService.logout(userId);
   }
 }

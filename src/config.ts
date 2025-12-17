@@ -39,6 +39,7 @@ const configSchema = z.object({
   // S3_ENPOINT: z.string(),
   // REDIS_URL: z.string(),
   MAX_ATTEMPTS: z.string(),
+  NODE_ENV: z.enum(['development', 'production', 'test']),
 });
 
 const configServer = configSchema.safeParse(process.env);

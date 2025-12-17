@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import moment from 'moment';
 import { OtpService } from '../otp/otp.service';
 import { OtpPurpose } from 'generated/prisma';
+import { AUTH_MESSAGE, COMMON_MESSAGE } from 'src/common/messages';
 
 @Injectable()
 export class AuthService {
@@ -39,7 +40,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException(COMMON_MESSAGE.NOT_FOUND('User'));
     }
 
     const payload = {
@@ -71,12 +72,12 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(COMMON_MESSAGE.INVALID('Email or password'));
     }
 
     const isPasswordMatch = await this.hashingService.compare(body.password, user.passwordHash);
     if (!isPasswordMatch) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(COMMON_MESSAGE.INVALID('Email or password'));
     }
 
     return await this.loginByUserId(user.id);
@@ -88,7 +89,7 @@ export class AuthService {
     });
 
     if (exists) {
-      throw new ConflictException('Email already exists');
+      throw new ConflictException(COMMON_MESSAGE.ALREADY_EXISTS('Email'));
     }
 
     const otpValid = await this.otpService.verifyOtp({
@@ -98,7 +99,7 @@ export class AuthService {
     });
 
     if (!otpValid.verified) {
-      throw new UnauthorizedException('Invalid OTP code');
+      throw new UnauthorizedException(AUTH_MESSAGE.OTP_INVALID);
     }
 
     const hashedPassword = await this.hashingService.hash(body.password);
@@ -131,7 +132,7 @@ export class AuthService {
     try {
       payload = await this.tokenSerivce.verifyRefreshToken(refreshToken);
     } catch (error) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException(COMMON_MESSAGE.INVALID('Refresh token'));
     }
 
     const token = await this.authRepo.findRefreshToken({
@@ -139,13 +140,13 @@ export class AuthService {
     });
 
     if (!token || token.revoked) {
-      throw new UnauthorizedException('Refresh token revoked');
+      throw new UnauthorizedException(AUTH_MESSAGE.REFRESH_TOKEN_REVOKED);
     }
 
     const isValid = await this.hashingService.compare(refreshToken, token.tokenHash);
 
     if (!isValid) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException(COMMON_MESSAGE.INVALID('Refresh token'));
     }
 
     await this.authRepo.revokeRefreshToken({
@@ -161,7 +162,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException(COMMON_MESSAGE.NOT_FOUND('User'));
     }
 
     return await this.otpService.requestOtp({
@@ -176,7 +177,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException(COMMON_MESSAGE.NOT_FOUND('User'));
     }
 
     const otpValid = await this.otpService.verifyOtp({
@@ -186,7 +187,7 @@ export class AuthService {
     });
 
     if (!otpValid.verified) {
-      throw new UnauthorizedException('Invalid OTP code');
+      throw new UnauthorizedException(AUTH_MESSAGE.OTP_INVALID);
     }
 
     const hashedPassword = await this.hashingService.hash(body.newPassword);
@@ -204,6 +205,25 @@ export class AuthService {
 
     return {
       message: 'Password reset successful',
+    };
+  }
+
+  async logout(userId: number) {
+    const refreshToken = await this.authRepo.findFristRefreshToken({
+      userId,
+      revoked: false
+    },{
+      expiresAt: 'desc',
+    })
+
+    if (!refreshToken) {
+      throw new UnauthorizedException(AUTH_MESSAGE.REFRESH_TOKEN_REVOKED);
+    }
+
+    await this.authRepo.revokeAllRefreshTokensForUser(userId);
+
+    return {
+      message: AUTH_MESSAGE.LOGOUT_SUCCESS,
     };
   }
 }

@@ -5,4 +5,5 @@ export const AUTH_MESSAGE = {
   REFRESH_TOKEN_REVOKED: 'Refresh token has been revoked',
   OTP_INVALID: 'OTP is invalid',
   OTP_EXPIRED: 'OTP has expired',
+  LOGOUT_SUCCESS: 'Logout successful',
 };

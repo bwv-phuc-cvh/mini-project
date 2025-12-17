@@ -18,7 +18,7 @@ import { ThrottlerBehindProxyGuard } from './common/guards/throttler-behind-prox
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
-        limit: 5,
+        limit: 10,
       },
     ]),
   ],

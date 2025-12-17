@@ -5,6 +5,7 @@ import moment from 'moment';
 import envConfig from 'src/config';
 import * as crypto from 'crypto';
 import { EmailService } from 'src/common/services/email.service';
+import { COMMON_MESSAGE, OTP_MESSAGE } from 'src/common/messages';
 
 @Injectable()
 export class OtpService {
@@ -28,7 +29,7 @@ export class OtpService {
     });
 
     if (recentOtp) {
-      return { message: 'An OTP has already been sent. Please check your email.' };
+      return { message: OTP_MESSAGE.OTP_REQUESTED_RECENTLY };
     }
 
     await this.otpRepo.updateMany(
@@ -57,11 +58,11 @@ export class OtpService {
     if (error) {
       throw new BadRequestException({
         field: 'code',
-        message: 'Failed to send OTP code, please try again later',
+        message: OTP_MESSAGE.OTP_SENT_FAILED,
       });
     }
 
-    return { message: 'OTP has been sent to your email.' };
+    return { message: OTP_MESSAGE.OTP_SENT_EMAIL_SUCCESS };
   }
 
   async verifyOtp({ email, code, purpose }: VerifyOtpBodyType) {
@@ -76,9 +77,9 @@ export class OtpService {
       },
     );
 
-    if (!record) throw new BadRequestException('OTP invalid');
-    if (moment().isAfter(record.expiresAt)) throw new BadRequestException('OTP expired');
-    if (record.attempts >= Number(envConfig.MAX_ATTEMPTS)) throw new BadRequestException('Too many attempts');
+    if (!record) throw new BadRequestException(COMMON_MESSAGE.INVALID('OTP'));
+    if (moment().isAfter(record.expiresAt)) throw new BadRequestException(COMMON_MESSAGE.EXPIRED('OTP'));
+    if (record.attempts >= Number(envConfig.MAX_ATTEMPTS)) throw new BadRequestException(OTP_MESSAGE.TOO_MANY_REQUESTS);
 
     const isValid = this.hashOtp(code) === record.otpHash;
     if (!isValid) {
@@ -86,7 +87,7 @@ export class OtpService {
         attempts: { increment: 1 },
       });
 
-      throw new BadRequestException('OTP invalid');
+      throw new BadRequestException(COMMON_MESSAGE.INVALID('OTP'));
     }
 
     await this.otpRepo.updateOtp(record.id, {

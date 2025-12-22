@@ -1,5 +1,11 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { ForgotPasswordBodyType, LoginBodyType, RegisterBodyType, ResetPasswordBodyType } from './auth.type';
+import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ChangePasswordBodyType,
+  ForgotPasswordBodyType,
+  LoginBodyType,
+  RegisterBodyType,
+  ResetPasswordBodyType,
+} from './auth.type';
 import { AuthRepository } from './auth.repository';
 import { HashingService } from 'src/common/services/hashing.service';
 import { TokenService } from 'src/common/services/token.service';
@@ -129,6 +135,10 @@ export class AuthService {
   async refreshToken(refreshToken: string) {
     let payload: RefreshTokenPayload;
 
+    if (!refreshToken) {
+      throw new UnauthorizedException(COMMON_MESSAGE.REQUIRED('Refresh token'));
+    }
+
     try {
       payload = await this.tokenSerivce.verifyRefreshToken(refreshToken);
     } catch (error) {
@@ -209,21 +219,43 @@ export class AuthService {
   }
 
   async logout(userId: number) {
-    const refreshToken = await this.authRepo.findFristRefreshToken({
-      userId,
-      revoked: false
-    },{
-      expiresAt: 'desc',
-    })
-
-    if (!refreshToken) {
-      throw new UnauthorizedException(AUTH_MESSAGE.REFRESH_TOKEN_REVOKED);
-    }
-
     await this.authRepo.revokeAllRefreshTokensForUser(userId);
 
     return {
       message: AUTH_MESSAGE.LOGOUT_SUCCESS,
+    };
+  }
+
+  async changePassword(body: ChangePasswordBodyType, userId: number) {
+    const user = await this.authRepo.findUniqueUser({
+      id: userId,
+    });
+
+    if (!user) {
+      throw new BadRequestException(COMMON_MESSAGE.NOT_FOUND('User'));
+    }
+
+    const isPasswordMatch = await this.hashingService.compare(body.oldPassword, user.passwordHash);
+
+    if (!isPasswordMatch) {
+      throw new BadRequestException(COMMON_MESSAGE.NOT_MATCH('old password', 'password current'));
+    }
+
+    const passwordHash = await this.hashingService.hash(body.newPassword);
+
+    await this.authRepo.updateUser(
+      {
+        id: user.id,
+      },
+      {
+        passwordHash,
+      },
+    );
+
+    await this.authRepo.revokeAllRefreshTokensForUser(user.id);
+
+    return {
+      message: 'Password changed successfully. Please login again.',
     };
   }
 }

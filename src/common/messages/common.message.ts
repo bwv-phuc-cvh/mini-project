@@ -6,4 +6,5 @@ export const COMMON_MESSAGE = {
   FORBIDDEN: 'Forbidden',
   UNAUTHORIZED: 'Unauthorized',
   EXPIRED: (name: string) => `${name} has expired`,
+  NOT_MATCH: (name: string, name2: string) => `${name} do not match ${name2}`,
 };

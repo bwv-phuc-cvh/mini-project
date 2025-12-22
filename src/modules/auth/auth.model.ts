@@ -51,3 +51,20 @@ export const ResetPassowrdBodySchema = z
       });
     }
   });
+
+export const ChangePasswordBodySchema = z
+  .object({
+    oldPassword: z.string().min(6).max(100),
+    newPassword: z.string().min(6).max(100),
+    confirmNewPassword: z.string().min(6).max(100),
+  })
+  .strict()
+  .superRefine(({ confirmNewPassword, newPassword }, ctx) => {
+    if (confirmNewPassword !== newPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Passwords do not match',
+        path: ['confirmNewPassword'],
+      });
+    }
+  });

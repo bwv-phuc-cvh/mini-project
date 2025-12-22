@@ -58,10 +58,13 @@ export class AuthRepository {
     });
   }
 
-  async findFristRefreshToken(where: Prisma.RefreshTokenWhereInput, orderBy?: Prisma.RefreshTokenOrderByWithRelationInput) {
+  async findFristRefreshToken(
+    where: Prisma.RefreshTokenWhereInput,
+    orderBy?: Prisma.RefreshTokenOrderByWithRelationInput,
+  ) {
     return this.prismaService.refreshToken.findFirst({
       where,
-      orderBy
+      orderBy,
     });
   }
 }
